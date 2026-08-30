@@ -61,3 +61,11 @@ def test_public_build_and_privacy_copy_include_versioned_funnel_contract():
     assert "trackAnonymousFunnel('docx_succeeded', releaseInfo.version)" in start_page
     assert "sessionStorage" in start_page
     assert "不发送职业资料、JD、联系方式、简历文本、文件名或反馈内容" in start_page
+
+
+def test_cloudbase_bootstrap_starts_the_http_app_on_the_runtime_port():
+    source = FUNCTION_PATH.read_text(encoding="utf-8")
+    bootstrap = (ROOT / "deployment" / "zaotu-function" / "scf_bootstrap").read_text(encoding="utf-8")
+    assert 'if __name__ == "__main__"' in source
+    assert 'app.run(host="0.0.0.0", port=int(os.getenv("PORT", "9000")))' in source
+    assert "exec /var/lang/python39/bin/python3.9 main.py" in bootstrap

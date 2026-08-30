@@ -1,3 +1,4 @@
 #!/bin/bash
+set -e
 export PYTHONPATH="./third_party:$PYTHONPATH"
-/var/lang/python39/bin/python3.9 main.py
+exec /var/lang/python39/bin/python3.9 main.py

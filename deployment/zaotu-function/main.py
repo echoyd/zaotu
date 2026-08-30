@@ -165,4 +165,11 @@ def public_api(path: str):
 
 
 if __name__ == "__main__":
+    # CloudBase starts scf_bootstrap for this HTTP function.  The Flask app
+    # must actively listen on the injected runtime port; importing this module
+    # in tests must remain side-effect free.
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "9000")))
+
+
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=9000)

@@ -1,0 +1,44 @@
+# Dependencies and build output
+frontend/node_modules/
+frontend/.npm-cache/
+frontend/.next/
+frontend/out/
+dist/
+build/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and runtime data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.db
+*.sqlite*
+runtime/
+logs/
+exports/
+
+# User files
+*.doc
+*.docx
+*.pdf
+*.jpg
+*.jpeg
+*.png
+!docs/assets/*.png
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

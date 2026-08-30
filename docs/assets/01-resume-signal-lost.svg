@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1440" viewBox="0 0 1080 1440" role="img">
+
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7b63ff"/><stop offset=".5" stop-color="#2d9cff"/><stop offset="1" stop-color="#27e0b8"/></linearGradient>
+    <linearGradient id="cyanGradient" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#4af2cf"/><stop offset="1" stop-color="#5ca8ff"/></linearGradient>
+    <linearGradient id="warningGradient" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ff5b45"/><stop offset="1" stop-color="#ff9a3d"/></linearGradient>
+    <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#071421" stop-opacity="0"/><stop offset=".58" stop-color="#06101c" stop-opacity=".74"/><stop offset="1" stop-color="#030912" stop-opacity=".98"/></linearGradient>
+    <radialGradient id="cyanGlow"><stop stop-color="#31d8ef" stop-opacity=".30"/><stop offset="1" stop-color="#31d8ef" stop-opacity="0"/></radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000814" flood-opacity=".48"/></filter>
+    <pattern id="microGrid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#6bdcf2" stroke-opacity=".07" stroke-width="1"/></pattern>
+  </defs>
+  <rect width="1080" height="1440" fill="#04101c"/>
+  <image href="campaign-scanner-bg.png" width="1080" height="1440" preserveAspectRatio="xMidYMid slice" opacity="0.62"/>
+  <rect width="1080" height="1440" fill="url(#microGrid)"/>
+  <rect width="1080" height="1440" fill="url(#bottomFade)"/>
+  <ellipse cx="190" cy="480" rx="430" ry="520" fill="#03101d" opacity=".78"/>
+
+
+  <g transform="translate(64 70)">
+    <rect width="62" height="62" rx="19" fill="url(#brandGradient)"/>
+    <path d="M16 20H45L20 44H47" fill="none" stroke="#efffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="16" cy="20" r="3.5" fill="#ff6b4a"/>
+    <path d="M45 38V49M39.5 43.5H50.5" stroke="#efffff" stroke-width="2.6" stroke-linecap="round"/>
+    <text x="80" y="27" fill="#f2fbff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="27" font-weight="850">造途 ZAOTU</text>
+    <text x="81" y="51" fill="#77d9e8" font-family="Arial,sans-serif" font-size="12" font-weight="800" letter-spacing="2.5">ENGINEERING CAREER OS</text>
+  </g>
+    <g transform="translate(64 182)">
+      <rect width="330" height="40" rx="20" fill="#ff6848" fill-opacity=".14" stroke="#ff765c" stroke-opacity=".72"/>
+      <circle cx="22" cy="20" r="5" fill="#ff664b" filter="url(#softGlow)"/>
+      <text x="39" y="26" fill="#ff9b83" font-family="Arial,'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="14" font-weight="900" letter-spacing="2">RESUME SIGNAL LOST</text>
+    </g>
+    <text x="64" y="320" fill="#f4fbff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="64" font-weight="900" text-anchor="start" letter-spacing="0"><tspan x="64" dy="0">项目做了三年，</tspan><tspan x="64" dy="76">简历上只剩一句：</tspan></text>
+    <text x="64" y="480" fill="#ff704f" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="91" font-weight="900" text-anchor="start" letter-spacing="0"><tspan x="64" dy="0">熟悉 PLC。</tspan></text>
+    <rect x="64" y="522" width="164" height="8" rx="4" fill="url(#warningGradient)"/>
+    <text x="64" y="590" fill="#c7d9e7" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="31" font-weight="700" text-anchor="start" letter-spacing="0"><tspan x="64" dy="0">能力可能没输，</tspan><tspan x="64" dy="45">但表达已经掉线。</tspan></text>
+    <g transform="translate(64 745)" filter="url(#cardShadow)">
+      <rect width="600" height="245" rx="28" fill="#071a2a" fill-opacity=".84" stroke="#4bd5e8" stroke-opacity=".27"/>
+      <text x="32" y="42" fill="#70e9da" font-family="Arial,sans-serif" font-size="13" font-weight="900" letter-spacing="2.5">DIAGNOSTIC REPORT</text>
+      <g font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="19" font-weight="750">
+        <circle cx="39" cy="85" r="6" fill="#ff6b4c"/><text x="60" y="92" fill="#e7f1f7">场景缺失</text><text x="348" y="92" fill="#ff8a70">未说明在哪做</text>
+        <circle cx="39" cy="137" r="6" fill="#ffb34f"/><text x="60" y="144" fill="#e7f1f7">动作模糊</text><text x="348" y="144" fill="#ffc169">看不出亲自做了什么</text>
+        <circle cx="39" cy="189" r="6" fill="#5de7cf"/><text x="60" y="196" fill="#e7f1f7">验证离线</text><text x="348" y="196" fill="#78e8dd">结果无法追问</text>
+      </g>
+    </g>
+    <g transform="translate(64 1275)">
+      <text x="0" y="0" fill="#f1fbff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="27" font-weight="850">免费检查你的工程证据链</text>
+      <text x="0" y="43" fill="#91aabe" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="18">约 20–30 分钟 · 不代投 · 不虚构经历</text>
+      <rect x="0" y="70" width="440" height="60" rx="17" fill="url(#cyanGradient)"/>
+      <text x="220" y="109" text-anchor="middle" fill="#032032" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="22" font-weight="900">在当前平台回复“封测”</text>
+    </g>
+  <text x="1016" y="1398" text-anchor="end" fill="#5c7c91" font-family="Arial,sans-serif" font-size="13" font-weight="800" letter-spacing="2">01 / 04</text>
+</svg>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1440" viewBox="0 0 1080 1440" role="img">
+
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7b63ff"/><stop offset=".5" stop-color="#2d9cff"/><stop offset="1" stop-color="#27e0b8"/></linearGradient>
+    <linearGradient id="cyanGradient" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#4af2cf"/><stop offset="1" stop-color="#5ca8ff"/></linearGradient>
+    <linearGradient id="warningGradient" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ff5b45"/><stop offset="1" stop-color="#ff9a3d"/></linearGradient>
+    <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#071421" stop-opacity="0"/><stop offset=".58" stop-color="#06101c" stop-opacity=".74"/><stop offset="1" stop-color="#030912" stop-opacity=".98"/></linearGradient>
+    <radialGradient id="cyanGlow"><stop stop-color="#31d8ef" stop-opacity=".30"/><stop offset="1" stop-color="#31d8ef" stop-opacity="0"/></radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000814" flood-opacity=".48"/></filter>
+    <pattern id="microGrid" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M44 0H0V44" fill="none" stroke="#6bdcf2" stroke-opacity=".07" stroke-width="1"/></pattern>
+  </defs>
+  <rect width="1080" height="1440" fill="#04101c"/>
+  <image href="campaign-scanner-bg.png" width="1080" height="1440" preserveAspectRatio="xMidYMid slice" opacity="0.28"/>
+  <rect width="1080" height="1440" fill="url(#microGrid)"/>
+  <rect width="1080" height="1440" fill="url(#bottomFade)"/>
+  <ellipse cx="190" cy="480" rx="430" ry="520" fill="#03101d" opacity=".78"/>
+
+
+  <g transform="translate(64 60)">
+    <rect width="62" height="62" rx="19" fill="url(#brandGradient)"/>
+    <path d="M16 20H45L20 44H47" fill="none" stroke="#efffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="16" cy="20" r="3.5" fill="#ff6b4a"/>
+    <path d="M45 38V49M39.5 43.5H50.5" stroke="#efffff" stroke-width="2.6" stroke-linecap="round"/>
+    <text x="80" y="27" fill="#f2fbff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="27" font-weight="850">造途 ZAOTU</text>
+    <text x="81" y="51" fill="#77d9e8" font-family="Arial,sans-serif" font-size="12" font-weight="800" letter-spacing="2.5">ENGINEERING CAREER OS</text>
+  </g>
+    <text x="64" y="210" fill="#70e9da" font-family="Arial,sans-serif" font-size="15" font-weight="900" letter-spacing="3">BEFORE / AFTER</text>
+    <text x="64" y="286" fill="#f4fbff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="65" font-weight="900" text-anchor="start" letter-spacing="0"><tspan x="64" dy="0">同一个项目，</tspan><tspan x="64" dy="76">两种写法。</tspan></text>
+    <text x="64" y="448" fill="#b9cedd" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="27" font-weight="700">招聘方能看到的，不一样。</text>
+    <g transform="translate(64 520)" filter="url(#cardShadow)">
+      <rect width="444" height="580" rx="28" fill="#1b1218" fill-opacity=".92" stroke="#ff674c" stroke-opacity=".48"/>
+      <rect x="28" y="28" width="130" height="38" rx="19" fill="#ff6049" fill-opacity=".18"/>
+      <text x="93" y="53" text-anchor="middle" fill="#ff8b72" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="15" font-weight="900">低信号写法</text>
+      <text x="28" y="116" fill="#fff3ef" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="28" font-weight="850">工具清单</text>
+      <g fill="#d5b8b2" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="24"><text x="28" y="186">参与自动化项目</text><text x="28" y="242">熟悉 PLC</text><text x="28" y="298">负责设备调试</text></g>
+      <line x1="28" y1="348" x2="416" y2="348" stroke="#ff7057" stroke-opacity=".25"/>
+      <g font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="18"><text x="28" y="401" fill="#ff8d76">× 场景没有交代</text><text x="28" y="447" fill="#ff8d76">× 本人动作不清</text><text x="28" y="493" fill="#ff8d76">× 结果无法核实</text></g>
+    </g>
+    <g transform="translate(572 520)" filter="url(#cardShadow)">
+      <rect width="444" height="580" rx="28" fill="#061d28" fill-opacity=".94" stroke="#54e2d2" stroke-opacity=".56"/>
+      <rect x="28" y="28" width="130" height="38" rx="19" fill="#43dec9" fill-opacity=".16"/>
+      <text x="93" y="53" text-anchor="middle" fill="#75eddd" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="15" font-weight="900">高信号结构</text>
+      <text x="28" y="116" fill="#efffff" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="28" font-weight="850">工程证据</text>
+      <g font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif">
+        <text x="28" y="179" fill="#59dcca" font-size="17" font-weight="900">场景</text><text x="96" y="179" fill="#d9edf2" font-size="21">产线联调</text>
+        <text x="28" y="241" fill="#59dcca" font-size="17" font-weight="900">动作</text><text x="96" y="241" fill="#d9edf2" font-size="21">梳理触发逻辑</text><text x="96" y="276" fill="#d9edf2" font-size="21">并完成设备联调</text>
+        <text x="28" y="338" fill="#59dcca" font-size="17" font-weight="900">工具</text><text x="96" y="338" fill="#d9edf2" font-size="21">PLC / 工业通信</text>
+        <text x="28" y="400" fill="#59dcca" font-size="17" font-weight="900">验证</text><text x="96" y="400" fill="#d9edf2" font-size="21">记录问题闭环</text><text x="96" y="435" fill="#d9edf2" font-size="21">与运行结果</text>
+      </g>
+      <rect x="28" y="495" width="388" height="58" rx="16" fill="#42dec8" fill-opacity=".12" stroke="#4ee2d0" stroke-opacity=".28"/>
+      <text x="222" y="532" text-anchor="middle" fill="#72e6d8" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="18" font-weight="850">结构示例，不替你编经历</text>
+    </g>
+    <text x="64" y="1185" fill="#f0f8fb" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="28" font-weight="850">造途做的不是“美化”，而是把真实经历讲清楚。</text>
+    <text x="64" y="1234" fill="#8da7b9" font-family="'Microsoft YaHei','Noto Sans SC','PingFang SC',Arial,sans-serif" font-size="19">只使用本人确认的职业资产，不生成雇主、证书、年限或成果。</text>
+  <text x="1016" y="1398" text-anchor="end" fill="#5c7c91" font-family="Arial,sans-serif" font-size="13" font-weight="800" letter-spacing="2">02 / 04</text>
+</svg>

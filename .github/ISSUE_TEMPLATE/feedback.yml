@@ -1,0 +1,53 @@
+name: 匿名封测反馈
+description: 提交脱敏后的卡点、材料质量问题或岗位方向建议
+title: "[反馈] "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢帮助改进造途。请勿提交姓名、联系方式、完整简历、完整 JD、证件照、客户资料、密钥或未打码截图。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 反馈环节
+      options:
+        - 职业资产整理
+        - 简历导入
+        - JD 证据匹配
+        - HR / 技术双预审
+        - ATS / Word 材料生成
+        - 求职工作台
+        - 隐私或安全
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: direction
+    attributes:
+      label: 岗位方向（可选）
+      description: 只填写通用方向，例如“电气自动化”或“机器视觉”，不要填写公司名称。
+  - type: textarea
+    id: steps
+    attributes:
+      label: 发生了什么
+      description: 请写清操作步骤、卡点以及你原本期待的结果，不要粘贴真实材料正文。
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 你希望如何改进（可选）
+  - type: input
+    id: environment
+    attributes:
+      label: 浏览器与设备（可选）
+      placeholder: 例如 Chrome 128 / Windows 11 / 桌面端
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私确认
+      options:
+        - label: 我确认本反馈不含个人联系方式、完整求职材料、客户资料、密钥或其他敏感信息。
+          required: true

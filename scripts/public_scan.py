@@ -10,7 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRECTORIES = {".git", ".next", ".npm-cache", "node_modules", "out", "__pycache__"}
 TEXT_SUFFIXES = {".css", ".html", ".js", ".json", ".md", ".mjs", ".py", ".svg", ".ts", ".tsx", ".txt", ".yml", ".yaml"}
 FORBIDDEN_PATH_PARTS = {"data/private", "runtime", "exports"}
-FORBIDDEN_FILES = {"auth.json", ".env"}
+FORBIDDEN_FILES = {
+    ".env",
+    "AGENTS.md",
+    "auth.json",
+    "开发日志.md",
+    "项目转接说明.md",
+    "验收记录.md",
+}
 PATTERNS = {
     "Windows 用户绝对路径": re.compile(r"[A-Za-z]:\\Users\\", re.IGNORECASE),
     "共同工作区绝对路径": re.compile(r"D:\\OneDrive\\Desktop\\codex", re.IGNORECASE),

@@ -11,7 +11,11 @@ build/
 venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
 .pytest_cache/
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
@@ -40,5 +44,10 @@ exports/
 # Editor and OS
 .vscode/
 .idea/
+.vs/
+**/bin/
+**/obj/
+*.suo
+*.user
 .DS_Store
 Thumbs.db

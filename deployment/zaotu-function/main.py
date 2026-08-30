@@ -6,6 +6,8 @@ contains no account, persistence, worker, or private-workspace code.
 
 from __future__ import annotations
 
+import os
+import re
 from urllib.parse import quote
 
 from flask import Flask, Response, jsonify, request
@@ -18,6 +20,58 @@ from app.public_product.profile_contract import PublicProfileAnalysisRequest, an
 
 
 app = Flask(__name__)
+
+
+# Funnel telemetry is deliberately limited to progress events.  Do not add
+# profile, job, document, contact, feedback or free-text fields here: the
+# anonymous beta must remain content-blind.
+TELEMETRY_EVENTS = frozenset({
+    "landing_view",
+    "beta_started",
+    "first_asset_confirmed",
+    "jd_submitted",
+    "materials_generated",
+    "docx_succeeded",
+    "feedback_packet_exported",
+})
+PUBLIC_ORIGINS = frozenset({
+    "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com",
+    *(origin.strip() for origin in os.getenv("ZAOTU_PUBLIC_ORIGINS", "").split(",") if origin.strip()),
+})
+TELEMETRY_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+
+
+@app.after_request
+def public_response_headers(response: Response) -> Response:
+    """Keep visitor responses private and allow only the public beta origin."""
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    origin = request.headers.get("Origin")
+    if origin in PUBLIC_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Vary"] = "Origin"
+    return response
+
+
+def parse_telemetry_payload() -> tuple[dict[str, str] | None, str | None]:
+    """Accept only an allowlisted, content-free anonymous funnel event."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return None, "请求体必须是 JSON 对象"
+    if set(payload) != {"event", "session_id", "version"}:
+        return None, "匿名统计只接受 event、session_id 与 version"
+    event = payload.get("event")
+    session_id = payload.get("session_id")
+    version = payload.get("version")
+    if event not in TELEMETRY_EVENTS:
+        return None, "不支持的匿名统计事件"
+    if not isinstance(session_id, str) or not TELEMETRY_SESSION_PATTERN.fullmatch(session_id):
+        return None, "匿名统计编号格式无效"
+    if not isinstance(version, str) or not 1 <= len(version) <= 48:
+        return None, "版本号格式无效"
+    return {"event": event, "session_id": session_id, "version": version}, None
 
 
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
@@ -36,6 +90,14 @@ def public_api(path: str):
         })
     if request.method != "POST":
         return jsonify({"detail": "Not Found"}), 404
+    if endpoint.endswith("/public/telemetry"):
+        telemetry, error = parse_telemetry_payload()
+        if error:
+            return jsonify({"detail": error}), 400
+        # CloudBase function logs can be aggregated by event/version.  The
+        # request body contains no career content or contact information.
+        app.logger.info("zaotu_funnel event=%s session=%s version=%s", telemetry["event"], telemetry["session_id"], telemetry["version"])
+        return jsonify({"success": True, "accepted": telemetry["event"]}), 202
     if endpoint.endswith("/public/guest/profile/materials/docx/template"):
         template = request.files.get("template")
         raw_payload = request.form.get("payload", "")

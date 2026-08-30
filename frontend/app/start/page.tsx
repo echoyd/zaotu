@@ -19,12 +19,15 @@ type BetaState = { tester_id: string; started_at: string; checklist: { profile: 
 type Store = { version: 2; profile: Profile; jobs: Job[]; beta?: BetaState }
 type Pane = { kind: 'resume' | 'interview' | 'application' | 'review'; title: string; summary: string; evidence: string[]; prompts: string[]; warnings: string[]; kit?: Kit; review?: EngineeringReview }
 type PublicPage = 'workspace' | 'profile' | 'templates' | 'opportunities' | 'applications' | 'beta'
+type TelemetryEvent = 'landing_view' | 'beta_started' | 'first_asset_confirmed' | 'jd_submitted' | 'materials_generated' | 'docx_succeeded' | 'feedback_packet_exported'
+type ReleaseInfo = { version: string; source_revision: string; generated_at: string }
 
 const storageKey = 'zaotu.showcase.beta.v1'
 const legacyProfileStorageKey = 'zaotu.public-profile.v1'
 const blankProfile: Profile = { display_name: '', phone: '', email: '', summary: '', skills: [], target_titles: [], preferences: { locations: [], salary_expectation: '', travel_preference: 'unspecified', availability: '' }, assets: [] }
 const blankJob = { title: '', company_name: '', source_url: '', location: '', salary: '', description: '', notes: '' }
 const betaVersion = 'v0.1.0-beta.1'
+const releaseManifestPath = '/zaotu-release.json'
 // Older beta builds accidentally mixed internal review notes into external
 // materials. Never surface a saved legacy draft or kit after an upgrade.
 const legacyInternalOutputPattern = /HR 与技术主管双视角自查|正在补充可核实|岗位要求完成|岗位适配|投递前核对/
@@ -36,10 +39,35 @@ const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, '').rep
 const compact = (value: string, length = 110) => value.replace(/\s+/g, ' ').trim().slice(0, length)
 const evidencePoints = (asset: CareerAsset) => (asset.highlights.length ? asset.highlights : asset.description.split(/[\n；;。]+/)).map(item => item.trim()).filter(Boolean).slice(0, 6)
 const formalApiBase = 'https://zaotu-beta-d6gya28z138ad2bfe.service.tcloudbase.com/api'
+const telemetryEndpoint = `${formalApiBase}/public/telemetry`
+const telemetrySessionStorageKey = 'zaotu.anonymous-funnel.session.v1'
 const publicPages: PublicPage[] = ['workspace', 'profile', 'templates', 'opportunities', 'applications', 'beta']
 const pageFromHash = (hash: string): PublicPage => {
   const candidate = hash.replace(/^#/, '')
   return publicPages.includes(candidate as PublicPage) ? candidate as PublicPage : 'workspace'
+}
+
+function telemetrySessionId() {
+  try {
+    const existing = window.sessionStorage.getItem(telemetrySessionStorageKey)
+    if (existing) return existing
+    const created = crypto.randomUUID().replaceAll('-', '')
+    window.sessionStorage.setItem(telemetrySessionStorageKey, created)
+    return created
+  } catch {
+    return crypto.randomUUID().replaceAll('-', '')
+  }
+}
+
+function trackAnonymousFunnel(event: TelemetryEvent, version = betaVersion) {
+  // This request never contains profile, JD, document, contact, feedback,
+  // referrer or any free-text field. Failure never interrupts product use.
+  void fetch(telemetryEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, session_id: telemetrySessionId(), version }),
+    keepalive: true,
+  }).catch(() => undefined)
 }
 
 // The public endpoint accepts a portable, anonymous profile contract.  This
@@ -148,6 +176,7 @@ export default function PublicStartPage() {
   const [resumePhoto, setResumePhoto] = useState<File | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
   const [exportingJobId, setExportingJobId] = useState<string | null>(null)
+  const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo>({ version: betaVersion, source_revision: 'local-preview', generated_at: '' })
   useEffect(() => {
     queueMicrotask(() => {
       const next = readStore()
@@ -157,6 +186,23 @@ export default function PublicStartPage() {
       setTargetTitlesInput(next.profile.target_titles.join(', '))
       setLocationsInput(next.profile.preferences.locations.join(', '))
     })
+  }, [])
+  useEffect(() => {
+    let trackedVersion = betaVersion
+    let active = true
+    void fetch(releaseManifestPath, { cache: 'no-store' })
+      .then(response => response.ok ? response.json() as Promise<Record<string, unknown>> : null)
+      .then(manifest => {
+        if (!active || !manifest) return
+        const version = typeof manifest.version === 'string' && manifest.version ? manifest.version : betaVersion
+        const source_revision = typeof manifest.source_revision === 'string' ? manifest.source_revision : 'unknown'
+        const generated_at = typeof manifest.generated_at === 'string' ? manifest.generated_at : ''
+        trackedVersion = version
+        setReleaseInfo({ version, source_revision, generated_at })
+      })
+      .catch(() => undefined)
+      .finally(() => trackAnonymousFunnel('landing_view', trackedVersion))
+    return () => { active = false }
   }, [])
   useEffect(() => {
     const syncPageFromHash = () => setPage(pageFromHash(window.location.hash))
@@ -201,7 +247,7 @@ export default function PublicStartPage() {
     setIsRefreshing(false)
     setNotice(jobs.length === 0 ? `刷新完成（${refreshedAt}）：当前还没有职位。` : confirmed === 0 ? `刷新完成（${refreshedAt}）：已重算 ${jobs.length} 条职位；当前没有“本人确认”的职业资产，所以匹配度不会明显提高。请先到“职业资料”补充。` : `刷新完成（${refreshedAt}）：已重算 ${jobs.length} 条职位，${changed ? `${changed} 条分数发生变化` : '分数未变化，说明当前资料与上次一致'}。`)
   }
-  const addJob = (event: FormEvent, confirmSimilar = false) => { event.preventDefault(); if (!jobForm.title.trim() || !jobForm.company_name.trim() || !jobForm.description.trim()) { setNotice('请填写职位名称、公司名称和完整 JD。'); return }; const title = normalize(jobForm.title); const company = normalize(jobForm.company_name); const url = normalize(jobForm.source_url); const same = store.jobs.filter(job => (url && normalize(job.source_url) === url) || (normalize(job.title) === title && normalize(job.company_name) === company)); if (same.length && !confirmSimilar) { setDuplicates(same); setNotice('发现疑似重复职位。请查看已有记录，或确认后保留为独立机会。'); return }; const job: Job = { id: crypto.randomUUID(), ...jobForm, status: 'ready', ...buildAnalysis(store.profile, jobForm), kits: [] }; save({ ...store, jobs: [job, ...store.jobs] }); setJobForm(blankJob); setDuplicates([]); setNotice('职位已保存，并完成初步匹配。') }
+  const addJob = (event: FormEvent, confirmSimilar = false) => { event.preventDefault(); if (!jobForm.title.trim() || !jobForm.company_name.trim() || !jobForm.description.trim()) { setNotice('请填写职位名称、公司名称和完整 JD。'); return }; const title = normalize(jobForm.title); const company = normalize(jobForm.company_name); const url = normalize(jobForm.source_url); const same = store.jobs.filter(job => (url && normalize(job.source_url) === url) || (normalize(job.title) === title && normalize(job.company_name) === company)); if (same.length && !confirmSimilar) { setDuplicates(same); setNotice('发现疑似重复职位。请查看已有记录，或确认后保留为独立机会。'); return }; const job: Job = { id: crypto.randomUUID(), ...jobForm, status: 'ready', ...buildAnalysis(store.profile, jobForm), kits: [] }; save({ ...store, jobs: [job, ...store.jobs] }); trackAnonymousFunnel('jd_submitted', releaseInfo.version); setJobForm(blankJob); setDuplicates([]); setNotice('职位已保存，并完成初步匹配。') }
   const deleteJob = (job: Job) => { if (!window.confirm(`删除本地职位“${job.title} · ${job.company_name}”？\n\n这会删除造途中的职位、草稿、材料和跟进记录；不会撤回招聘平台上的真实投递。`)) return; save({ ...store, jobs: store.jobs.filter(item => item.id !== job.id) }); setNotice('本地职位记录已删除。') }
   const makeDraft = (job: Job, variant: Variant) => {
     if (!store.profile.assets.some(asset => asset.confirmed)) { setNotice('尚未生成招呼语：请先在“职业资料”新增至少一条本人确认的经历、项目或技能实践。'); return }
@@ -230,6 +276,7 @@ export default function PublicStartPage() {
     if (!kit) {
       kit = kitFor(store.profile, job, (job.kits[0]?.version_no || 0) + 1)
       updateJob(job.id, item => ({ ...item, kits: [kit!, ...item.kits] }))
+      trackAnonymousFunnel('materials_generated', releaseInfo.version)
       setNotice(refreshKit ? '已按最新资产与双视角审查生成新版；旧版本仍保留在此浏览器。' : '已生成岗位材料，并完成 HR / 技术主管双视角审查。')
     }
     setKitPanes(current => ({ ...current, [job.id]: current[job.id] || 'resume' }))
@@ -256,6 +303,7 @@ export default function PublicStartPage() {
       const blob = await response.blob()
       if (!blob.size) throw new Error('正式 Word 文件为空')
       downloadBlob(blob, `造途_${job.title}_岗位专属简历_V${kit.version_no}.docx`)
+      trackAnonymousFunnel('docx_succeeded', releaseInfo.version)
       setNotice(resumeTemplate ? `已按“${resumeTemplate.name}”填充并下载 DOCX。请用 Word 打开后核对所有占位内容与一页排版，再另存为 PDF。` : resumePhoto ? '已下载含本人证件照的默认正式 DOCX。请重点核对照片裁切、姓名、段落与一页排版，再另存为 PDF。' : '已下载可编辑的工程技术正式版 DOCX。请用 Word 打开后核对一页排版，再使用“另存为 PDF”生成最终投递版。')
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误'
@@ -266,7 +314,7 @@ export default function PublicStartPage() {
   }
   const markApplied = (job: Job) => { updateJob(job.id, item => ({ ...item, status: 'applied', outcome: item.outcome || { status: 'applied', note: '' } })); setNotice('已记录为“已投递”。') }
 
-  const updateAssets = (assets: CareerAsset[]) => { const profile = { ...profileDraft, assets }; setProfileDraft(profile); save({ ...store, profile }); setNotice('职业资产库已保存；之后的匹配和材料只会使用本人确认的资产。') }
+  const updateAssets = (assets: CareerAsset[]) => { const profile = { ...profileDraft, assets }; const hadConfirmed = store.profile.assets.some(asset => asset.confirmed); if (!hadConfirmed && assets.some(asset => asset.confirmed)) trackAnonymousFunnel('first_asset_confirmed', releaseInfo.version); setProfileDraft(profile); save({ ...store, profile }); setNotice('职业资产库已保存；之后的匹配和材料只会使用本人确认的资产。') }
   const applyImportedDraft = (draft: ResumeImportDraft) => {
     const currentSkills = splitItems(skillsInput)
     const mergedSkills = Array.from(new Set([...currentSkills, ...draft.skills]))
@@ -290,6 +338,7 @@ export default function PublicStartPage() {
     if (beta.started_at) { setNotice(`当前浏览器已加入封测，测试编号为 ${beta.tester_id}。`); return }
     const testerId = `ZT-${Math.random().toString(36).slice(2, 7).toUpperCase()}-${new Date().toISOString().slice(5, 10).replace('-', '')}`
     updateBeta(current => ({ ...current, tester_id: testerId, started_at: new Date().toISOString() }))
+    trackAnonymousFunnel('beta_started', releaseInfo.version)
     setNotice(`已开启封测任务。你的匿名测试编号是 ${testerId}，不会关联姓名、简历或 JD 内容。`)
   }
   const updateBetaChecklist = (key: keyof BetaState['checklist'], checked: boolean) => updateBeta(current => ({ ...current, checklist: { ...current.checklist, [key]: checked } }))
@@ -299,8 +348,8 @@ export default function PublicStartPage() {
     setNotice('反馈已只保存在当前浏览器。完成后请下载或复制“匿名反馈包”发送给邀请你的测试负责人。')
   }
   const deleteBetaFeedback = (id: string) => { if (!window.confirm('删除这条本地反馈？删除后无法恢复。')) return; updateBeta(current => ({ ...current, feedback: current.feedback.filter(item => item.id !== id) })); setNotice('已删除本地反馈。') }
-  const betaPacket = () => JSON.stringify({ product: 'ZAOTU', version: betaVersion, tester_id: beta.tester_id || '未启动封测', exported_at: new Date().toISOString(), checklist: beta.checklist, feedback: beta.feedback, privacy: '不包含职业资料、联系方式、JD、简历文本、Word 文件或其他求职内容。' }, null, 2)
-  const exportBetaPacket = () => { downloadBlob(new Blob([betaPacket()], { type: 'application/json' }), `造途_匿名封测反馈包_${beta.tester_id || '未启动'}_${new Date().toISOString().slice(0, 10)}.json`); setNotice('匿名反馈包已下载：其中不含你的职业资料、JD 或简历内容。') }
+  const betaPacket = () => JSON.stringify({ product: 'ZAOTU', version: releaseInfo.version, tester_id: beta.tester_id || '未启动封测', exported_at: new Date().toISOString(), checklist: beta.checklist, feedback: beta.feedback, privacy: '不包含职业资料、联系方式、JD、简历文本、Word 文件或其他求职内容。' }, null, 2)
+  const exportBetaPacket = () => { downloadBlob(new Blob([betaPacket()], { type: 'application/json' }), `造途_匿名封测反馈包_${beta.tester_id || '未启动'}_${new Date().toISOString().slice(0, 10)}.json`); trackAnonymousFunnel('feedback_packet_exported', releaseInfo.version); setNotice('匿名反馈包已下载：其中不含你的职业资料、JD 或简历内容。') }
 
   return <div className="job-shell">
     <ZaotuMobileNavigation page={page} jobs={store.jobs.length} feedbackCount={beta.feedback.length} onNavigate={navigate} />
@@ -346,7 +395,7 @@ export default function PublicStartPage() {
         <header><span className="job-eyebrow">CAREER EVIDENCE</span><h1 className="job-page-title">职业资料</h1><p className="job-subtitle">先建立真实、可追问的证据底座；只有“本人确认”的资产会进入匹配与正式材料。</p></header>
         {notice && <div className="job-notice">{notice}</div>}
         <section className="job-section"><div className="job-import-grid">
-          <div className="job-panel job-form"><div className="job-form-top"><div className="job-form-title">求职画像与联系方式</div><span className="job-form-hint">正式导出前至少填写一种联系方式</span></div>
+          <div className="job-panel job-form"><div className="job-form-top"><div className="job-form-title">求职画像与联系方式</div><span className="job-form-hint">联系方式仅在导出 Word 时使用</span></div><p className="job-card-copy">手机和邮箱始终保存在当前浏览器；只有你点击“导出正式 Word”时，所需联系方式才会随本次 HTTPS 请求进入服务端内存并立即返回 DOCX。不会建账户、同步或长期保存。</p>
             <div className="job-form-row"><Field label="称呼 *" value={profileDraft.display_name} onChange={value => setProfileDraft({ ...profileDraft, display_name: value })} placeholder="如何称呼你" /><Field label="目标岗位方向 *" value={targetTitlesInput} onChange={setTargetTitlesInput} placeholder="自动化工程师、机器视觉工程师" /></div>
             <div className="job-form-row"><Field label="手机（与邮箱至少填一项）" value={profileDraft.phone} onChange={value => setProfileDraft({ ...profileDraft, phone: value })} placeholder="用于正式简历" /><Field label="邮箱（与手机至少填一项）" value={profileDraft.email} onChange={value => setProfileDraft({ ...profileDraft, email: value })} placeholder="用于正式简历" type="email" /></div>
             <ResumePhotoField photo={resumePhoto} previewUrl={photoPreviewUrl} inputRef={resumePhotoInputRef} onChoose={chooseResumePhoto} onClear={clearResumePhoto} />
@@ -364,7 +413,7 @@ export default function PublicStartPage() {
       {page === 'templates' && <div className="job-shell"><header><span className="job-eyebrow">RESUME SYSTEM</span><h1 className="job-page-title">简历模板</h1><p className="job-subtitle">默认模板已按一页式工程技术简历重构；你也可以临时导入自己的 DOCX 版式。</p></header>{notice && <div className="job-notice">{notice}</div>}<ResumeTemplatePicker file={resumeTemplate} inputRef={resumeTemplateInputRef} onChoose={chooseTemplate} onClear={() => { setResumeTemplate(null); setNotice('已切回造途工程技术正式版。') }} /></div>}
       {page === 'opportunities' && <Opportunities jobs={store.jobs} notice={notice} lastRefresh={lastRefresh} isRefreshing={isRefreshing} onRefresh={() => void refresh()} onOpen={() => navigate('workspace')} onDelete={deleteJob} />}
       {page === 'applications' && <Applications jobs={store.jobs.filter(job => job.status === 'applied')} notice={notice} onRefresh={() => setNotice('已刷新本地投递记录。')} onOpen={() => navigate('workspace')} onDelete={deleteJob} onOutcome={(id, status, note) => updateJob(id, job => ({ ...job, outcome: { status, note } }))} />}
-      {page === 'beta' && <BetaCenter beta={beta} onStart={startBeta} onChecklist={updateBetaChecklist} onSubmitFeedback={addBetaFeedback} onDeleteFeedback={deleteBetaFeedback} onCopyPacket={() => void copy(betaPacket(), '匿名反馈包')} onDownloadPacket={exportBetaPacket} />}
+      {page === 'beta' && <BetaCenter beta={beta} release={releaseInfo} onStart={startBeta} onChecklist={updateBetaChecklist} onSubmitFeedback={addBetaFeedback} onDeleteFeedback={deleteBetaFeedback} onCopyPacket={() => void copy(betaPacket(), '匿名反馈包')} onDownloadPacket={exportBetaPacket} />}
     </main>
   </div>
 }
@@ -388,7 +437,8 @@ function ZaotuMobileNavigation({ page, jobs, feedbackCount, onNavigate }: { page
   </nav>
 }
 
-function BetaCenter({ beta, onStart, onChecklist, onSubmitFeedback, onDeleteFeedback, onCopyPacket, onDownloadPacket }: { beta: BetaState; onStart: () => void; onChecklist: (key: keyof BetaState['checklist'], checked: boolean) => void; onSubmitFeedback: (draft: Omit<BetaFeedback, 'id' | 'created_at'>) => void; onDeleteFeedback: (id: string) => void; onCopyPacket: () => void; onDownloadPacket: () => void }) {
+function BetaCenter({ beta, release, onStart, onChecklist, onSubmitFeedback, onDeleteFeedback, onCopyPacket, onDownloadPacket }: { beta: BetaState; release: ReleaseInfo; onStart: () => void; onChecklist: (key: keyof BetaState['checklist'], checked: boolean) => void; onSubmitFeedback: (draft: Omit<BetaFeedback, 'id' | 'created_at'>) => void; onDeleteFeedback: (id: string) => void; onCopyPacket: () => void; onDownloadPacket: () => void }) {
+  const betaVersion = release.version
   const [kind, setKind] = useState<BetaFeedbackKind>('bug')
   const [severity, setSeverity] = useState<BetaFeedbackSeverity>('normal')
   const [title, setTitle] = useState('')
@@ -407,8 +457,8 @@ function BetaCenter({ beta, onStart, onChecklist, onSubmitFeedback, onDeleteFeed
     <header><span className="job-eyebrow">CLOSED BETA · LOCAL FIRST</span><h1 className="job-page-title">封测中心</h1><p className="job-subtitle">这是 20 人免费封测版。先完整走一次真实求职材料流程，再用不含简历内容的匿名反馈包反馈问题。</p></header>
     <section className="job-section">
       <div className="job-beta-invite"><div><span>20 PEOPLE · FREE BETA</span><h2>让真实工程经历，被岗位需求看见。</h2><p>面向自动化、PLC 电气、机器视觉、工业软件、嵌入式、机械、测试质量和电力能源方向的学生、应届生与 1–5 年从业者。全程约 20–30 分钟；不代投、不虚构经历、不承诺 offer。</p></div><div className="job-beta-invite-points"><div><b>你会完成</b><span>资料 → JD → 双视角预审 → Word</span></div><div><b>你需要交付</b><span>仅匿名反馈包，不发简历或 JD 原文</span></div></div></div>
-      <div className="job-beta-hero"><div><span>当前封测版本</span><strong>{betaVersion}</strong><p>{beta.started_at ? `本浏览器测试编号：${beta.tester_id}` : '尚未启动测试；启动后只会在本浏览器生成一个随机测试编号。'}</p></div><button type="button" className="job-primary-btn" onClick={onStart}>{beta.started_at ? <><BiCheck />已加入封测</> : <><BiPlus />启动我的封测</>}</button></div>
-      <div className="job-beta-privacy"><BiCheck /><div><strong>资料如何被处理</strong><p>职业资料、JD 与材料默认保存在当前浏览器。点击生成正式 Word 时，本次所需资料会通过一次性 HTTPS 请求在服务端内存处理并返回 DOCX；不建立账户、不做数据库同步或长期保存。匿名反馈包只含版本、任务勾选与问题描述，不带出求职内容。</p></div></div>
+      <div className="job-beta-hero"><div><span>当前封测版本</span><strong>{release.version}</strong><p>构建 {release.source_revision.slice(0, 7)}{release.generated_at ? ` · ${new Date(release.generated_at).toLocaleDateString('zh-CN')}` : ''}</p><p>{beta.started_at ? `本浏览器测试编号：${beta.tester_id}` : '尚未启动测试；启动后只会在本浏览器生成一个随机测试编号。'}</p></div><button type="button" className="job-primary-btn" onClick={onStart}>{beta.started_at ? <><BiCheck />已加入封测</> : <><BiPlus />启动我的封测</>}</button></div>
+      <div className="job-beta-privacy"><BiCheck /><div><strong>资料如何被处理</strong><p>职业资料、JD 与材料默认保存在当前浏览器。点击生成正式 Word 时，本次所需资料会通过一次性 HTTPS 请求在服务端内存处理并返回 DOCX；不建立账户、不做数据库同步或长期保存。封测只记录事件名、版本和当前标签页随机编号，用于统计流程完成情况；不发送职业资料、JD、联系方式、简历文本、文件名或反馈内容，也不使用 Cookie 或跨站追踪。</p></div></div>
     </section>
     <section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">四步测试任务</h2><p className="job-section-note">完成 {completeCount}/4 项即可交付第一轮反馈；不需要为了测试而编造任何经历。</p></div><span className="job-score">{completeCount}/4 已完成</span></div><div className="job-beta-tasks">{tasks.map((task, index) => <label key={task.key} className={`job-beta-task ${beta.checklist[task.key] ? 'is-complete' : ''}`}><input type="checkbox" checked={beta.checklist[task.key]} onChange={event => onChecklist(task.key, event.target.checked)} /><b>{String(index + 1).padStart(2, '0')}</b><span><strong>{task.title}</strong><small>{task.detail}</small></span><BiCheck /></label>)}</div></section>
     <section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">匿名问题记录</h2><p className="job-section-note">优先写可复现问题：在哪个页面、做了什么、预期什么、实际发生什么。不要粘贴姓名、电话、邮箱、完整 JD 或简历正文。</p></div><span className="job-score">{beta.feedback.length} 条本地反馈</span></div><div className="job-import-grid"><form className="job-panel job-form" onSubmit={submit}><div className="job-form-top"><div className="job-form-title">记录一条反馈</div><span className="job-form-hint">仅保存于当前浏览器</span></div><div className="job-form-row"><div className="job-field"><label>反馈类型 *</label><select className="job-select" value={kind} onChange={event => setKind(event.target.value as BetaFeedbackKind)}><option value="bug">功能异常</option><option value="usability">操作不清楚</option><option value="material_quality">材料内容质量</option><option value="word_pdf">Word / PDF 视觉问题</option><option value="suggestion">功能建议</option></select></div><div className="job-field"><label>影响程度 *</label><select className="job-select" value={severity} onChange={event => setSeverity(event.target.value as BetaFeedbackSeverity)}><option value="blocker">阻塞：无法继续</option><option value="high">严重：核心流程受影响</option><option value="normal">一般：可绕开</option><option value="idea">建议：体验优化</option></select></div></div><Field label="一句话标题 *" value={title} onChange={setTitle} placeholder="例如：导出 Word 后第二页出现孤立标题" required /><Field label="复现步骤（建议）" value={steps} onChange={setSteps} placeholder="例如：完成职业资料 → 保存一条职位 → 生成材料 → 点击导出 Word" textarea /><Field label="预期结果（建议）" value={expected} onChange={setExpected} placeholder="例如：简历应保持一页，标题与内容不分离" textarea /><Field label="实际结果 *" value={actual} onChange={setActual} placeholder="只描述现象；请不要粘贴个人资料或完整简历内容" textarea required /><div className="job-focus-actions"><button type="submit" className="job-primary-btn"><BiPlus />保存本地反馈</button></div></form><div className="job-panel job-profile-preview"><div className="job-form-top"><div className="job-form-title">交付给测试负责人</div><span className="job-form-hint">不发送求职内容</span></div><p className="job-card-copy">完成任务后，复制或下载匿名反馈包，再将其发送给邀请你参与封测的人。若涉及视觉问题，可另外附一张已打码的界面截图。</p><div className="job-focus-actions"><button type="button" className="job-muted-btn" onClick={onCopyPacket}><BiCopy />复制匿名反馈包</button><button type="button" className="job-muted-btn" onClick={onDownloadPacket}><BiDownload />下载 JSON 反馈包</button></div><p className="job-card-copy">版本追踪：{betaVersion} · 反馈包仅记录测试编号、时间、任务完成情况与问题描述。</p></div></div>{beta.feedback.length > 0 && <div className="job-beta-feedback-list">{beta.feedback.map(item => <article key={item.id} className="job-resume-focus"><div className="flex items-start justify-between gap-3"><div><b>{({ bug: '功能异常', usability: '操作不清楚', material_quality: '材料内容质量', word_pdf: 'Word / PDF 视觉问题', suggestion: '功能建议' })[item.kind]} · {({ blocker: '阻塞', high: '严重', normal: '一般', idea: '建议' })[item.severity]}</b><p>{new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.created_at))}</p></div><button type="button" className="job-danger-btn" onClick={() => onDeleteFeedback(item.id)}><BiTrash />删除</button></div><strong>{item.title}</strong><p>{item.actual}</p>{item.steps && <p>步骤：{item.steps}</p>}{item.expected && <p>预期：{item.expected}</p>}</article>)}</div>}</section>

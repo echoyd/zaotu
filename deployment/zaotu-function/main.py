@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 from urllib.parse import quote
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_from_directory
 from pydantic import ValidationError
 
 from app.public_product.demo_profiles import public_demo_profiles
@@ -20,6 +21,7 @@ from app.public_product.profile_contract import PublicProfileAnalysisRequest, an
 
 
 app = Flask(__name__)
+PUBLIC_STATIC_DIR = Path(__file__).resolve().parent / "public"
 
 
 # Funnel telemetry is deliberately limited to progress events.  Do not add
@@ -41,10 +43,33 @@ PUBLIC_ORIGINS = frozenset({
 TELEMETRY_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 
+def serve_public_static(path: str):
+    """Serve only files explicitly included in the public static package.
+
+    The deployment builder copies the independently audited beta bundle into
+    ``public``.  This allows CloudBase's function access service to provide a
+    normal HTML response when the static-hosting default domain forces an
+    attachment response.  A missing file deliberately falls through to the
+    API router; traversal paths are never served.
+    """
+    if not PUBLIC_STATIC_DIR.is_dir():
+        return None
+    relative = Path(path or "index.html")
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+    target = PUBLIC_STATIC_DIR / relative
+    if not target.is_file():
+        return None
+    return send_from_directory(PUBLIC_STATIC_DIR, relative.as_posix())
+
+
 @app.after_request
 def public_response_headers(response: Response) -> Response:
     """Keep visitor responses private and allow only the public beta origin."""
-    response.headers.setdefault("Cache-Control", "no-store")
+    # Flask's static-file helper otherwise supplies ``no-cache``.  The beta
+    # contract is stricter: every visitor response, including the release
+    # manifest, must be non-persistent.
+    response.headers["Cache-Control"] = "no-store"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     origin = request.headers.get("Origin")
     if origin in PUBLIC_ORIGINS:
@@ -79,6 +104,10 @@ def parse_telemetry_payload() -> tuple[dict[str, str] | None, str | None]:
 def public_api(path: str):
     if request.method == "OPTIONS":
         return ("", 204)
+    if request.method == "GET":
+        static_response = serve_public_static(path)
+        if static_response is not None:
+            return static_response
     endpoint = "/" + path
     if endpoint.endswith("/healthz"):
         return jsonify({"status": "ok", "service": "zaotu-anonymous-beta"})
@@ -169,7 +198,3 @@ if __name__ == "__main__":
     # must actively listen on the injected runtime port; importing this module
     # in tests must remain side-effect free.
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "9000")))
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=9000)

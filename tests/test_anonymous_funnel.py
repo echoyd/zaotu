@@ -66,6 +66,13 @@ def test_public_build_and_privacy_copy_include_versioned_funnel_contract():
 def test_cloudbase_bootstrap_starts_the_http_app_on_the_runtime_port():
     source = FUNCTION_PATH.read_text(encoding="utf-8")
     bootstrap = (ROOT / "deployment" / "zaotu-function" / "scf_bootstrap").read_text(encoding="utf-8")
-    assert 'if __name__ == "__main__"' in source
+    assert source.count('if __name__ == "__main__"') == 1
     assert 'app.run(host="0.0.0.0", port=int(os.getenv("PORT", "9000")))' in source
     assert "exec /var/lang/python39/bin/python3.9 main.py" in bootstrap
+
+
+def test_function_static_fallback_is_limited_to_the_audited_public_bundle():
+    source = FUNCTION_PATH.read_text(encoding="utf-8")
+    assert 'PUBLIC_STATIC_DIR = Path(__file__).resolve().parent / "public"' in source
+    assert "relative.is_absolute() or \"..\" in relative.parts" in source
+    assert "send_from_directory(PUBLIC_STATIC_DIR, relative.as_posix())" in source

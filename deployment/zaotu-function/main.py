@@ -41,6 +41,7 @@ PUBLIC_ORIGINS = frozenset({
     "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com",
     *(origin.strip() for origin in os.getenv("ZAOTU_PUBLIC_ORIGINS", "").split(",") if origin.strip()),
 })
+CLOUDBASE_ROOT_ORIGIN = "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com"
 TELEMETRY_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 
@@ -74,9 +75,12 @@ def public_response_headers(response: Response) -> Response:
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     origin = request.headers.get("Origin")
     if origin in PUBLIC_ORIGINS:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        # The CloudBase root HTTP service adds CORS for its own default
+        # domain. Avoid a duplicate Access-Control-Allow-Origin value there.
+        if origin != CLOUDBASE_ROOT_ORIGIN:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         response.headers["Vary"] = "Origin"
     return response
 

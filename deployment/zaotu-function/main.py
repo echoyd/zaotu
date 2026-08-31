@@ -37,6 +37,7 @@ TELEMETRY_EVENTS = frozenset({
     "feedback_packet_exported",
 })
 PUBLIC_ORIGINS = frozenset({
+    "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com",
     "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com",
     *(origin.strip() for origin in os.getenv("ZAOTU_PUBLIC_ORIGINS", "").split(",") if origin.strip()),
 })

@@ -4,7 +4,7 @@
 
 造途帮助你把真实工作、项目、实训和作品整理为可核对的职业资产，再结合一条具体 JD，生成匹配依据、能力缺口、HR / 技术主管双视角预审、ATS 文本和可编辑 Word 简历。
 
-[立即体验造途匿名封测版](https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com/#beta)
+[立即体验造途匿名封测版](https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com/#beta)
 
 ![造途：真实工程经历转为岗位证据](docs/assets/02-before-after.svg)
 

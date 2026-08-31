@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FUNCTION_PATH = ROOT / "deployment" / "zaotu-function" / "main.py"
-PUBLIC_ORIGIN = "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com"
+PUBLIC_ORIGIN = "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com"
 
 
 def load_function():

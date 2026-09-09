@@ -38,8 +38,19 @@ const splitItems = (value: string) => value.split(/[,，、\n]/).map(item => ite
 const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, '').replace(/[，。、·:：()（）【】\[\]-]/g, '')
 const compact = (value: string, length = 110) => value.replace(/\s+/g, ' ').trim().slice(0, length)
 const evidencePoints = (asset: CareerAsset) => (asset.highlights.length ? asset.highlights : asset.description.split(/[\n；;。]+/)).map(item => item.trim()).filter(Boolean).slice(0, 6)
-const formalApiBase = 'https://zaotu-beta-d6gya28z138ad2bfe.service.tcloudbase.com/api'
-const telemetryEndpoint = `${formalApiBase}/public/telemetry`
+const productionApiBase = 'https://zaotu-beta-d6gya28z138ad2bfe.service.tcloudbase.com/api'
+const localApiBasePattern = /^http:\/\/127\.0\.0\.1:(?:[1-9]\d{1,4})(?:\/api)?$/
+const formalApiBase = () => {
+  if (typeof window === 'undefined') return productionApiBase
+  const override = new URLSearchParams(window.location.search).get('apiBase') || ''
+  if (localApiBasePattern.test(override)) return override.endsWith('/api') ? override : `${override}/api`
+  // The isolated local review server intentionally has one fixed companion
+  // function.  This keeps the review URL short while production remains on
+  // CloudBase and cannot be redirected to an arbitrary host.
+  if (window.location.hostname === '127.0.0.1' && window.location.port === '6868') return 'http://127.0.0.1:9001/api'
+  return productionApiBase
+}
+const publicApiUrl = (path: string) => `${formalApiBase()}${path}`
 const telemetrySessionStorageKey = 'zaotu.anonymous-funnel.session.v1'
 const publicPages: PublicPage[] = ['workspace', 'profile', 'templates', 'opportunities', 'applications', 'beta']
 const pageFromHash = (hash: string): PublicPage => {
@@ -62,7 +73,7 @@ function telemetrySessionId() {
 function trackAnonymousFunnel(event: TelemetryEvent, version = betaVersion) {
   // This request never contains profile, JD, document, contact, feedback,
   // referrer or any free-text field. Failure never interrupts product use.
-  void fetch(telemetryEndpoint, {
+  void fetch(publicApiUrl('/public/telemetry'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ event, session_id: telemetrySessionId(), version }),
@@ -175,6 +186,7 @@ export default function PublicStartPage() {
   const [resumeTemplate, setResumeTemplate] = useState<File | null>(null)
   const [resumePhoto, setResumePhoto] = useState<File | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
+  const [isImportingPdfReference, setIsImportingPdfReference] = useState(false)
   const [exportingJobId, setExportingJobId] = useState<string | null>(null)
   const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo>({ version: betaVersion, source_revision: 'local-preview', generated_at: '' })
   useEffect(() => {
@@ -292,10 +304,10 @@ export default function PublicStartPage() {
     try {
       const payload = { profile: toFormalProfile(store.profile, job.title, Boolean(resumePhoto)), job: { title: job.title, company_name: job.company_name, location: job.location, salary: job.salary, description: job.description } }
       const response = resumeTemplate
-        ? await (() => { const body = new FormData(); body.append('payload', JSON.stringify(payload)); body.append('template', resumeTemplate); return fetch(`${formalApiBase}/public/guest/profile/materials/docx/template`, { method: 'POST', body }) })()
+        ? await (() => { const body = new FormData(); body.append('payload', JSON.stringify(payload)); body.append('template', resumeTemplate); return fetch(publicApiUrl('/public/guest/profile/materials/docx/template'), { method: 'POST', body }) })()
         : resumePhoto
-          ? await (() => { const body = new FormData(); body.append('payload', JSON.stringify(payload)); body.append('photo', resumePhoto); return fetch(`${formalApiBase}/public/guest/profile/materials/docx/photo`, { method: 'POST', body }) })()
-        : await fetch(`${formalApiBase}/public/guest/profile/materials/docx`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+          ? await (() => { const body = new FormData(); body.append('payload', JSON.stringify(payload)); body.append('photo', resumePhoto); return fetch(publicApiUrl('/public/guest/profile/materials/docx/photo'), { method: 'POST', body }) })()
+        : await fetch(publicApiUrl('/public/guest/profile/materials/docx'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!response.ok) {
         const detail = await response.json().catch(() => ({})) as { detail?: string }
         throw new Error(detail.detail || '正式 Word 服务暂时不可用')
@@ -332,6 +344,19 @@ export default function PublicStartPage() {
     setNotice(`已从“${draft.sourceName}”加入 ${draft.assets.length} 条待确认资产；现有资料未被覆盖。请在资产库逐条核对并勾选“本人确认”。`)
   }
   const chooseTemplate = (file: File | null) => { if (!file) return; if (!file.name.toLowerCase().endsWith('.docx')) { setNotice('自定义模板目前只支持 .docx；PDF 只能作为视觉参考，不能直接套版。'); return }; if (file.size > 2 * 1024 * 1024) { setNotice('自定义 DOCX 模板不能超过 2MB。'); return }; setResumeTemplate(file); setNotice(`已选择“${file.name}”。模板仅在当前浏览器标签页暂存，导出时在服务端内存中处理，不会保存到服务器。`) }
+  const importPdfResumeReference = async (file: File | null) => {
+    if (!file || isImportingPdfReference) return
+    if (!(file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf')) { setNotice('请只选择 PDF 简历；若要保留自己的排版，请在 Word 中使用 DOCX 模板。'); return }
+    setIsImportingPdfReference(true)
+    try {
+      const draft = await parseResumeFile(file)
+      applyImportedDraft(draft)
+      navigate('profile')
+      setNotice(`已从“${draft.sourceName}”本地提取 ${draft.assets.length} 条待确认职业资产。PDF 原版式不会上传或复刻；确认资料后将使用造途默认版式，或你另选的 DOCX 模板导出。`)
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'PDF 暂时无法读取。请使用带文字层的 PDF，或在职业资料页手动填写。')
+    } finally { setIsImportingPdfReference(false) }
+  }
   const clearResumePhoto = () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); setPhotoPreviewUrl(''); setResumePhoto(null); setNotice('已移除本次会话的证件照；不会影响已保存的职业资料。') }
   const chooseResumePhoto = (file: File | null) => { if (!file) return; if (!['image/jpeg', 'image/png'].includes(file.type)) { setNotice('证件照仅支持 JPG 或 PNG。'); return }; if (file.size > 2 * 1024 * 1024) { setNotice('证件照不能超过 2MB。'); return }; if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); setResumePhoto(file); setPhotoPreviewUrl(URL.createObjectURL(file)); setNotice('已选择证件照：仅在当前浏览器标签页和本次默认 Word 导出中使用，不会保存到服务器或备份文件。') }
   const startBeta = () => {
@@ -364,11 +389,11 @@ export default function PublicStartPage() {
     <main className="job-main">
       {page === 'workspace' && <>
         <header className="job-page-header"><div><span className="job-eyebrow">CAREER INTELLIGENCE · LOCAL FIRST</span><h1 className="job-page-title">MAKE THE NEXT MOVE COUNT.</h1></div></header>
-        <ShowcaseHero actions={<>{profileReadiness.ready ? <a href="#capture" className="job-primary-btn"><BiPlus />添加职位</a> : <button className="job-primary-btn" onClick={() => navigate('profile')}><BiUser />先完善职业资料</button>}<button className="job-secondary-btn" onClick={() => navigate('opportunities')}>查看机会 <BiArrowToRight /></button></>} dateLabel={today} timeLabel={clock} metrics={[{ value: store.jobs.length, label: 'SAVED' }, { value: ready, label: 'REVIEW' }, { value: applied, label: 'APPLIED' }]} nextMove={profileReadiness.ready ? (ready ? 'REVIEW OPEN OPPORTUNITIES' : 'CAPTURE YOUR NEXT OPPORTUNITY') : 'COMPLETE YOUR CAREER PROFILE'} />
+        <ShowcaseHero actions={<>{profileReadiness.ready ? <a href="#capture" className="job-primary-btn"><BiPlus />导入岗位</a> : <button className="job-primary-btn" onClick={() => navigate('profile')}><BiUser />先完善职业资料</button>}<button className="job-secondary-btn" onClick={() => navigate('opportunities')}>查看机会 <BiArrowToRight /></button></>} dateLabel={today} timeLabel={clock} metrics={[{ value: store.jobs.length, label: 'SAVED' }, { value: ready, label: 'REVIEW' }, { value: applied, label: 'APPLIED' }]} nextMove={profileReadiness.ready ? (ready ? 'REVIEW OPEN OPPORTUNITIES' : 'CAPTURE YOUR NEXT OPPORTUNITY') : 'COMPLETE YOUR CAREER PROFILE'} />
         {notice && <div className="job-notice" role="status" aria-live="polite">{notice}</div>}
         {!profileReadiness.ready && <section className="job-section job-onboarding-gate" aria-label="开始前准备"><div><span className="job-eyebrow">FIRST STEP</span><h2>先完成职业资料，再生成可投递材料</h2><p>职位 JD 可以随时先保存；但正式 Word 只会使用你本人确认的技能与经历。当前还差：{profileReadiness.missing.slice(0, 3).join('、')}。</p></div><button className="job-primary-btn" type="button" onClick={() => navigate('profile')}>去完善资料 <BiArrowToRight /></button></section>}
         <section id="capture" className="job-section">
-          <div className="job-section-head"><div><h2 className="job-section-title">捕获一个机会</h2><p className="job-section-note">粘贴完整 JD；系统会用你在“职业资料”中确认的证据分析并生成材料。</p></div></div>
+          <div className="job-section-head"><div><h2 className="job-section-title">导入一个真实岗位</h2><p className="job-section-note">从任意招聘渠道复制完整 JD；系统只使用你本人确认的职业证据进行分析并生成材料。</p></div></div>
           <div className="job-import-grid">
             <form className="job-panel job-form" onSubmit={event => addJob(event)}>
               <div className="job-form-top"><div className="job-form-title">职位速记</div><span className="job-form-hint">职位名称、公司和完整 JD 必填</span></div>
@@ -389,7 +414,7 @@ export default function PublicStartPage() {
             </div>
           </div>
         </section>
-        <section id="opportunities" className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">机会雷达</h2><p className="job-section-note">只收录你主动保存的职位；刷新会自动保存当前职业资料并重新计算匹配度。{lastRefresh && ` 最近刷新：${lastRefresh}`}</p></div><button className="job-link-btn" onClick={() => void refresh()} disabled={isRefreshing} aria-busy={isRefreshing}><BiRefresh className={isRefreshing ? 'job-refresh-spin' : ''} />{isRefreshing ? '正在重新分析…' : '按最新资料刷新'}</button></div>{store.jobs.length === 0 ? <Empty text="第一条机会，会从这里开始。" /> : <div className="grid gap-3">{store.jobs.map(job => <WorkspaceCard key={job.id} job={job} pane={panes[job.id]} activePane={kitPanes[job.id] || 'resume'} isExporting={exportingJobId === job.id} onClose={() => setPanes(current => { const next = { ...current }; delete next[job.id]; return next })} onPaneChange={value => setKitPanes(current => ({ ...current, [job.id]: value }))} onDraft={makeDraft} onPlan={openPlan} onInterview={openInterview} onReview={openReview} onKit={openKit} onCopy={copy} onExport={exportKit} onApplied={markApplied} onDelete={deleteJob} onFollowUp={value => updateJob(job.id, item => ({ ...item, follow_up_at: value }))} />)}</div>}</section>
+        <section id="opportunities" className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">正在处理的岗位</h2><p className="job-section-note">只收录你主动导入的真实岗位；刷新会自动保存当前职业资料并重新计算匹配度。{lastRefresh && ` 最近刷新：${lastRefresh}`}</p></div><button className="job-link-btn" onClick={() => void refresh()} disabled={isRefreshing} aria-busy={isRefreshing}><BiRefresh className={isRefreshing ? 'job-refresh-spin' : ''} />{isRefreshing ? '正在重新分析…' : '按最新资料刷新'}</button></div>{store.jobs.length === 0 ? <Empty text="还没有导入岗位。第一条真实 JD 会从这里开始。" /> : <div className="grid gap-3">{store.jobs.map(job => <WorkspaceCard key={job.id} job={job} pane={panes[job.id]} activePane={kitPanes[job.id] || 'resume'} isExporting={exportingJobId === job.id} onClose={() => setPanes(current => { const next = { ...current }; delete next[job.id]; return next })} onPaneChange={value => setKitPanes(current => ({ ...current, [job.id]: value }))} onDraft={makeDraft} onPlan={openPlan} onInterview={openInterview} onReview={openReview} onKit={openKit} onCopy={copy} onExport={exportKit} onApplied={markApplied} onDelete={deleteJob} onFollowUp={value => updateJob(job.id, item => ({ ...item, follow_up_at: value }))} />)}</div>}</section>
       </>}
       {page === 'profile' && <div className="job-shell">
         <header><span className="job-eyebrow">CAREER EVIDENCE</span><h1 className="job-page-title">职业资料</h1><p className="job-subtitle">先建立真实、可追问的证据底座；只有“本人确认”的资产会进入匹配与正式材料。</p></header>
@@ -410,8 +435,8 @@ export default function PublicStartPage() {
         <ResumeImportPanel onApply={applyImportedDraft} />
         <AssetLibrary assets={profileDraft.assets} onChange={updateAssets} />
       </div>}
-      {page === 'templates' && <div className="job-shell"><header><span className="job-eyebrow">RESUME SYSTEM</span><h1 className="job-page-title">简历模板</h1><p className="job-subtitle">默认模板已按一页式工程技术简历重构；你也可以临时导入自己的 DOCX 版式。</p></header>{notice && <div className="job-notice">{notice}</div>}<ResumeTemplatePicker file={resumeTemplate} inputRef={resumeTemplateInputRef} onChoose={chooseTemplate} onClear={() => { setResumeTemplate(null); setNotice('已切回造途工程技术正式版。') }} /></div>}
-      {page === 'opportunities' && <Opportunities jobs={store.jobs} notice={notice} lastRefresh={lastRefresh} isRefreshing={isRefreshing} onRefresh={() => void refresh()} onOpen={() => navigate('workspace')} onDelete={deleteJob} />}
+      {page === 'templates' && <div className="job-shell"><header><span className="job-eyebrow">RESUME SYSTEM</span><h1 className="job-page-title">简历模板</h1><p className="job-subtitle">DOCX 用于保留自己的排版；PDF 可直接本地读取为职业资料，再生成可编辑的岗位专属简历。</p></header>{notice && <div className="job-notice">{notice}</div>}<ResumeTemplatePicker file={resumeTemplate} inputRef={resumeTemplateInputRef} onChoose={chooseTemplate} onClear={() => { setResumeTemplate(null); setNotice('已切回造途工程技术正式版。') }} /><PdfResumeReferencePicker onImport={file => void importPdfResumeReference(file)} isImporting={isImportingPdfReference} /></div>}
+      {page === 'opportunities' && <Opportunities jobs={store.jobs} notice={notice} lastRefresh={lastRefresh} isRefreshing={isRefreshing} onRefresh={() => void refresh()} onCapture={() => { navigate('workspace'); window.setTimeout(() => document.getElementById('capture')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), 50) }} onOpen={() => navigate('workspace')} onDelete={deleteJob} />}
       {page === 'applications' && <Applications jobs={store.jobs.filter(job => job.status === 'applied')} notice={notice} onRefresh={() => setNotice('已刷新本地投递记录。')} onOpen={() => navigate('workspace')} onDelete={deleteJob} onOutcome={(id, status, note) => updateJob(id, job => ({ ...job, outcome: { status, note } }))} />}
       {page === 'beta' && <BetaCenter beta={beta} release={releaseInfo} onStart={startBeta} onChecklist={updateBetaChecklist} onSubmitFeedback={addBetaFeedback} onDeleteFeedback={deleteBetaFeedback} onCopyPacket={() => void copy(betaPacket(), '匿名反馈包')} onDownloadPacket={exportBetaPacket} />}
     </main>
@@ -448,7 +473,7 @@ function BetaCenter({ beta, release, onStart, onChecklist, onSubmitFeedback, onD
   const completeCount = Object.values(beta.checklist).filter(Boolean).length
   const tasks: Array<{ key: keyof BetaState['checklist']; title: string; detail: string }> = [
     { key: 'profile', title: '建立真实职业资料', detail: '填写至少 3 项实际接触的技能，并新增一条本人确认的经历、项目或实训资产。' },
-    { key: 'job', title: '粘贴一条真实或公开 JD', detail: '保存后检查匹配线索、机会雷达刷新和 HR / 技术主管审查是否看得懂。' },
+    { key: 'job', title: '导入一条真实或公开 JD', detail: '从招聘平台、企业官网或内推消息复制完整 JD，保存后检查匹配线索和 HR / 技术主管审查是否看得懂。' },
     { key: 'material', title: '生成并下载正式 Word', detail: '资料达到门槛后，生成岗位材料并下载 DOCX；不需要把 Word 文件发给测试负责人。' },
     { key: 'visual', title: '完成 Word / PDF 视觉核对', detail: '用本机 Word 打开 DOCX，核对姓名、段落、分页与一页排版；发现问题只描述现象。' },
   ]
@@ -530,5 +555,12 @@ function WorkspaceCard({ job, pane, activePane, isExporting, onClose, onPaneChan
 function ReviewSummary({ review }: { review: EngineeringReview }) {
   return <div className="job-internal-review"><b>仅供本人查看 · 双视角预审（不随复制或导出发送）</b><p>HR：{review.hr_review.strengths[0] || '待补充可读、可核实的职业资料。'}</p><p>技术主管：{review.technical_review.strengths[0] || '尚未形成可追问的技术证据链。'}</p><p>发布门槛：{review.release_gate === 'ready_for_visual_review' ? '可进入 A4 视觉核对' : '需补齐真实资产后再投递'}</p></div>
 }
-function Opportunities({ jobs, notice, lastRefresh, isRefreshing, onRefresh, onOpen, onDelete }: { jobs: Job[]; notice: string; lastRefresh: string; isRefreshing: boolean; onRefresh: () => void; onOpen: () => void; onDelete: (job: Job) => void }) { return <div className="job-shell"><header><span className="job-eyebrow">OPPORTUNITY LIBRARY</span><h1 className="job-page-title">职位机会</h1><p className="job-subtitle">只呈现你主动保存的职位。先比较匹配线索，再决定是否继续。</p></header><section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">已收集 {jobs.length} 条</h2><p className="job-section-note">刷新会自动保存当前职业资料并重新计算全部职位。{lastRefresh && ` 最近刷新：${lastRefresh}`}</p></div><button className="job-link-btn" onClick={onRefresh} disabled={isRefreshing}><BiRefresh className={isRefreshing ? 'job-refresh-spin' : ''} />{isRefreshing ? '正在重新分析…' : '按最新资料刷新'}</button></div>{notice && <p className="job-notice">{notice}</p>}{jobs.length === 0 ? <Empty text="机会库还是空的。" /> : <div className="grid gap-3">{jobs.map(job => <ShowcaseJobCard key={job.id} title={job.title} company={job.company_name} meta={[job.location, job.salary, job.status === 'applied' ? '已投递' : '待判断'].filter(Boolean).join('  ·  ')} score={`${job.match_score}% 匹配`} summary={job.analysis_summary} skills={job.matched_skills}><div className="job-card-actions"><button className="job-link-btn inline-flex items-center gap-1" onClick={onOpen}>回到工作台处理 <BiArrowToRight /></button><button className="job-danger-btn inline-flex items-center gap-1" onClick={() => onDelete(job)}><BiTrash />删除本地记录</button></div></ShowcaseJobCard>)}</div>}</section></div> }
+function PdfResumeReferencePicker({ onImport, isImporting }: { onImport: (file: File | null) => void; isImporting: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  return <section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">导入 PDF 简历</h2><p className="job-section-note">PDF 用于本地读取真实职业资料，不会被当作可替换文字的模板。</p></div><span className="job-score">本地解析</span></div><div className="job-panel job-profile-preview"><div className="job-form-top"><div className="job-form-title">PDF 简历参考导入（Beta）</div><span className="job-form-hint">不上传 · 不复刻版式</span></div><p className="job-card-copy">支持带文字层的 PDF，最大 6MB、最多读取前 12 页。系统会提取候选技能、经历、项目和教育信息，导入后必须由你逐条确认，才会进入匹配和正式材料。</p><p className="job-card-copy">PDF 原版式、图片和分页不会上传或复刻。最终 Word 使用造途默认工程技术版式，或你另选的 DOCX 模板；只有 DOCX 模板才支持保留自己的排版。</p><div className="job-focus-actions"><button type="button" className="job-muted-btn" onClick={() => inputRef.current?.click()} disabled={isImporting}><BiUpload />{isImporting ? '正在本地读取…' : '选择 PDF 简历'}</button><input ref={inputRef} className="hidden" type="file" accept=".pdf,application/pdf" onChange={event => { const selected = event.target.files?.[0] || null; event.target.value = ''; onImport(selected) }} /></div></div></section>
+}
+
+function Opportunities({ jobs, notice, lastRefresh, isRefreshing, onRefresh, onCapture, onOpen, onDelete }: { jobs: Job[]; notice: string; lastRefresh: string; isRefreshing: boolean; onRefresh: () => void; onCapture: () => void; onOpen: () => void; onDelete: (job: Job) => void }) {
+  return <div className="job-shell"><header><span className="job-eyebrow">OPPORTUNITY LIBRARY</span><h1 className="job-page-title">职位机会</h1><p className="job-subtitle">把你在任何招聘渠道找到的岗位带回来；造途负责判断、材料和复盘，不替代招聘平台搜索。</p></header><section className="job-section zaotu-opportunity-intake"><div className="job-section-head"><div><span className="job-eyebrow">REAL JD INTAKE</span><h2 className="job-section-title">从任何渠道导入一个真实岗位</h2><p className="job-section-note">支持 BOSS、猎聘、智联、企业官网、公众号、社群或内推消息。复制完整 JD 和可选链接即可。</p></div><button type="button" className="job-primary-btn" onClick={onCapture}><BiPlus />导入岗位并分析</button></div><div className="zaotu-opportunity-steps"><div><b>01</b><strong>在原渠道筛选</strong><p>保留你信任的平台、公司官网或内推来源。</p></div><div><b>02</b><strong>复制完整 JD</strong><p>岗位要求越完整，匹配与审查越可追问。</p></div><div><b>03</b><strong>回造途做决策</strong><p>用真实职业证据完成双预审、材料和复盘。</p></div></div><p className="zaotu-opportunity-privacy"><BiCheck />造途不登录招聘平台、不自动抓取或投递；职业资料默认只保存在当前浏览器。</p></section><section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">已导入 {jobs.length} 条</h2><p className="job-section-note">刷新会自动保存当前职业资料并重新计算全部岗位。{lastRefresh && ` 最近刷新：${lastRefresh}`}</p></div><button className="job-link-btn" onClick={onRefresh} disabled={isRefreshing}><BiRefresh className={isRefreshing ? 'job-refresh-spin' : ''} />{isRefreshing ? '正在重新分析…' : '按最新资料刷新'}</button></div>{notice && <p className="job-notice">{notice}</p>}{jobs.length === 0 ? <Empty text="还没有导入岗位。先从你已经找到的真实 JD 开始。" /> : <div className="grid gap-3">{jobs.map(job => <ShowcaseJobCard key={job.id} title={job.title} company={job.company_name} meta={[job.location, job.salary, job.status === 'applied' ? '已投递' : '待判断'].filter(Boolean).join('  ·  ')} score={`${job.match_score}% 匹配`} summary={job.analysis_summary} skills={job.matched_skills}><div className="job-card-actions"><button className="job-link-btn inline-flex items-center gap-1" onClick={onOpen}>回到工作台处理 <BiArrowToRight /></button><button className="job-danger-btn inline-flex items-center gap-1" onClick={() => onDelete(job)}><BiTrash />删除本地记录</button></div></ShowcaseJobCard>)}</div>}</section></div>
+}
 function Applications({ jobs, notice, onRefresh, onOpen, onDelete, onOutcome }: { jobs: Job[]; notice: string; onRefresh: () => void; onOpen: () => void; onDelete: (job: Job) => void; onOutcome: (id: string, status: string, note: string) => void }) { return <div className="job-shell"><header><span className="job-eyebrow">APPLICATION REVIEW</span><h1 className="job-page-title">投递复盘</h1><p className="job-subtitle">记录已经由你亲自完成的投递，并在工作台设置下一次跟进时间。</p></header><section className="job-section"><div className="job-section-head"><div><h2 className="job-section-title">已投递 {jobs.length} 条</h2><p className="job-section-note">这里只整理你的进展；不会代替任何招聘平台发送或撤回内容。</p></div><button className="job-link-btn" onClick={onRefresh}>刷新列表</button></div>{notice && <p className="job-notice">{notice}</p>}{jobs.length === 0 ? <Empty text="还没有投递记录。" /> : <div className="grid gap-3">{jobs.map(job => <ShowcaseJobCard key={job.id} title={job.title} company={job.company_name} meta={[job.location, job.salary, '已投递'].filter(Boolean).join(' · ')} score="已记录"><div className="job-card-actions"><button className="job-link-btn inline-flex items-center gap-1" onClick={onOpen}>设置跟进或查看草稿 <BiArrowToRight /></button><button className="job-danger-btn inline-flex items-center gap-1" onClick={() => onDelete(job)}><BiTrash />删除本地记录</button></div><div className="job-outcome-row"><select aria-label={`${job.title} 的投递进展`} value={job.outcome?.status || 'applied'} onChange={event => onOutcome(job.id, event.target.value, job.outcome?.note || '')}>{outcomeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input aria-label={`${job.title} 的结果备注`} value={job.outcome?.note || ''} onChange={event => onOutcome(job.id, job.outcome?.status || 'applied', event.target.value)} placeholder="例如：约周三下午一面" /><button type="button" className="job-muted-btn" onClick={() => onOutcome(job.id, job.outcome?.status || 'applied', job.outcome?.note || '')}>保存进展</button></div></ShowcaseJobCard>)}</div>}</section></div> }

@@ -1,12 +1,31 @@
 # 造途 ZAOTU
 
-面向工程技术求职者的岗位专属材料与求职决策工具。
+[![CI](https://github.com/echoyd/zaotu/actions/workflows/ci.yml/badge.svg)](https://github.com/echoyd/zaotu/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
+![Stage: Closed Beta](https://img.shields.io/badge/stage-closed%20beta-3686a0)
+
+面向工程技术求职者的职业证据、岗位匹配与求职材料工作台。
 
 造途帮助你把真实工作、项目、实训和作品整理为可核对的职业资产，再结合一条具体 JD，生成匹配依据、能力缺口、HR / 技术主管双视角预审、ATS 文本和可编辑 Word 简历。
 
-[立即体验造途匿名封测版](https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com/#beta)
+[立即体验匿名封测版](https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com/#beta) · [提交脱敏反馈](https://github.com/echoyd/zaotu/issues/new?template=feedback.yml)
 
-![造途：真实工程经历转为岗位证据](docs/assets/02-before-after.svg)
+![造途匿名工作台：职业资产、真实 JD 与岗位材料闭环](docs/assets/zaotu-workspace.png)
+
+## 产品闭环
+
+1. 从 DOCX、带文字层的 PDF 或手工填写建立职业资产，并逐条由本人确认；
+2. 从任意招聘渠道复制一条真实 JD，造途用已确认资产给出匹配依据与能力缺口；
+3. 完成 HR / 技术主管双视角预审，生成 ATS 文本、岗位招呼语和可编辑 Word 简历；
+4. 由用户自行核对、投递并在本地记录跟进结果。
+
+造途不替代招聘平台搜索，不登录招聘网站，也不自动投递。它聚焦在“找到岗位以后，如何用真实证据做判断并完成材料”这一段。
+
+| PDF 职业资料导入 | 真实 JD 导入与岗位决策 |
+| --- | --- |
+| ![PDF 简历在浏览器本地提取职业资料](docs/assets/zaotu-pdf-import.png) | ![从任意招聘渠道导入真实 JD](docs/assets/zaotu-jd-intake.png) |
+
+> 截图使用空白或虚构演示数据，不包含真实用户简历、联系方式或企业资料。
 
 ## 适合谁
 
@@ -18,7 +37,7 @@
 
 - 职业资产：把经历拆成背景、本人动作、工具、交付物与验证结果；
 - 简历导入：DOCX 和带文字层的 PDF 只在浏览器本地解析，导入后默认待本人确认；
-- JD 匹配：从已确认资产中选择证据，显示直接匹配、相邻能力和待确认缺口；
+- 真实 JD 导入与匹配：从任意招聘渠道复制岗位内容，再从已确认资产中选择证据，显示直接匹配、相邻能力和待确认缺口；
 - 双视角预审：分别从 HR 可读性和技术主管可追问性检查材料；
 - 投递材料：生成 ATS 文本、岗位招呼语和可编辑 DOCX；
 - 求职工作台：保存职位、材料版本、投递状态、跟进和复盘；
@@ -77,6 +96,8 @@ npm run build
 本仓库仅包含造途匿名公开产品所需的白名单源码、虚构演示资料、封测说明和岗位母版。它不包含个人工作台、私人履历、真实用户资料、数据库、导出简历、认证状态、云端密钥、内部协作指令、开发日志、验收记录或私人仓库历史。
 
 当前版本是免费匿名封测版，不代投、不自动登录招聘网站、不虚构经历，也不承诺 offer。
+
+概念说明图仍保留在 [`docs/assets/02-before-after.svg`](docs/assets/02-before-after.svg)，但仓库首页优先展示可复核的真实产品界面。
 
 ## 反馈
 

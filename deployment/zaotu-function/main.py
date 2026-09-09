@@ -42,6 +42,8 @@ PUBLIC_ORIGINS = frozenset({
     *(origin.strip() for origin in os.getenv("ZAOTU_PUBLIC_ORIGINS", "").split(",") if origin.strip()),
 })
 CLOUDBASE_ROOT_ORIGIN = "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.ap-shanghai.app.tcloudbase.com"
+CLOUDBASE_STATIC_ORIGIN = "https://zaotu-beta-d6gya28z138ad2bfe-1459334972.tcloudbaseapp.com"
+CLOUDBASE_MANAGED_ORIGINS = frozenset({CLOUDBASE_ROOT_ORIGIN, CLOUDBASE_STATIC_ORIGIN})
 TELEMETRY_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 
@@ -73,11 +75,15 @@ def public_response_headers(response: Response) -> Response:
     # manifest, must be non-persistent.
     response.headers["Cache-Control"] = "no-store"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    # CloudBase may otherwise mark ordinary function responses as downloads.
+    # Keep web/API responses inline while preserving DOCX attachment headers.
+    if response.mimetype != "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        response.headers["Content-Disposition"] = "inline"
     origin = request.headers.get("Origin")
     if origin in PUBLIC_ORIGINS:
-        # The CloudBase root HTTP service adds CORS for its own default
-        # domain. Avoid a duplicate Access-Control-Allow-Origin value there.
-        if origin != CLOUDBASE_ROOT_ORIGIN:
+        # CloudBase writes CORS for both default domains. Adding it again in
+        # Flask produces duplicate values that browsers reject.
+        if origin not in CLOUDBASE_MANAGED_ORIGINS:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type"

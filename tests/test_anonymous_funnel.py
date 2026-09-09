@@ -31,8 +31,20 @@ def test_anonymous_funnel_accepts_only_allowlisted_progress_metadata():
         assert response.status_code == 202
         assert response.get_json() == {"success": True, "accepted": event}
         assert response.headers["cache-control"] == "no-store"
-        assert response.headers["access-control-allow-origin"] == PUBLIC_ORIGIN
+        assert "access-control-allow-origin" not in response.headers
+        assert response.headers["vary"] == "Origin"
+        assert response.headers["content-disposition"] == "inline"
         assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_cloudbase_default_origins_defer_cors_to_the_cloudbase_gateway():
+    module = load_function()
+    client = module.app.test_client()
+    for origin in module.CLOUDBASE_MANAGED_ORIGINS:
+        response = client.options("/api/public/telemetry", headers={"Origin": origin})
+        assert response.status_code == 204
+        assert "access-control-allow-origin" not in response.headers
+        assert response.headers["vary"] == "Origin"
 
 
 def test_anonymous_funnel_rejects_profile_and_free_text_payloads():
@@ -61,6 +73,12 @@ def test_public_build_and_privacy_copy_include_versioned_funnel_contract():
     assert "trackAnonymousFunnel('docx_succeeded', releaseInfo.version)" in start_page
     assert "sessionStorage" in start_page
     assert "不发送职业资料、JD、联系方式、简历文本、文件名或反馈内容" in start_page
+    assert "PdfResumeReferencePicker" in start_page
+    assert "选择 PDF 简历" in start_page
+    assert "从任何渠道导入一个真实岗位" in start_page
+    assert "不替代招聘平台搜索" in start_page
+    assert "JobRadar" not in start_page
+    assert "/public/jobs/search" not in start_page
 
 
 def test_cloudbase_bootstrap_starts_the_http_app_on_the_runtime_port():

@@ -88,5 +88,7 @@ def test_anonymous_http_function_returns_health_and_docx():
         json=request.model_dump(mode="json"),
     )
     assert health.status_code == 200
+    assert health.headers["Content-Disposition"] == "inline"
     assert document.status_code == 200
     assert document.data.startswith(b"PK")
+    assert document.headers["Content-Disposition"].startswith("attachment;")
